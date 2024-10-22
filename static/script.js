@@ -14,6 +14,7 @@ function uploadDocument(type) {
             fetch('/upload', {
                 method: 'POST',
                 headers: {
+                
                     'Content-Type': 'application/json',
                 },
                 body: JSON.stringify({
@@ -55,18 +56,21 @@ function fetchActionItems() {
         })
         .then(data => {
             const actionItemsContainer = document.getElementById('action-items');
-            actionItemsContainer.innerHTML = '<h2>Action Items</h2>';
+            actionItemsContainer.innerHTML = '';
             data.forEach(item => {
                 const div = document.createElement('div');
                 div.className = 'action-item';
                 div.innerHTML = `
                     <div class="action-item-header">
-                        <span><strong>${item.document_type}</strong> (Score: ${item.score})</span>
-                        <button onclick="openReviewModal('${item.document_id}', '${item.document_type}', ${item.score}, '${item.explanation.replace(/'/g, "\\'")}')">Review</button>
+                        <h5><i class="fas fa-file-alt me-2"></i>${item.document_type}</h5>
+                        <span class="badge bg-primary">Score: ${item.score}</span>
                     </div>
                     <div class="action-item-explanation">
                         <p>${item.explanation}</p>
                     </div>
+                    <button class="btn btn-outline-primary mt-2" onclick="openReviewModal('${item.document_id}', '${item.document_type}', ${item.score}, '${item.explanation.replace(/'/g, "\\'")}')">
+                        <i class="fas fa-eye me-2"></i>Review
+                    </button>
                 `;
                 actionItemsContainer.appendChild(div);
             });
@@ -79,7 +83,7 @@ function fetchActionItems() {
 
 function openReviewModal(documentId, documentType, score, explanation) {
     currentDocumentId = documentId;
-    const modal = document.getElementById('reviewModal');
+    const modal = new bootstrap.Modal(document.getElementById('reviewModal'));
     const reviewTitle = document.getElementById('reviewTitle');
     const scoreText = document.getElementById('scoreText');
     const explanationText = document.getElementById('explanationText');
@@ -92,9 +96,9 @@ function openReviewModal(documentId, documentType, score, explanation) {
     explanationText.textContent = `Explanation: ${explanation}`;
 
     // Reset viewers
-    documentPreview.style.display = 'none';
-    pdfViewer.style.display = 'none';
-    docxViewer.style.display = 'none';
+    documentPreview.classList.add('d-none');
+    pdfViewer.classList.add('d-none');
+    docxViewer.classList.add('d-none');
     docxViewer.innerHTML = '';
 
     fetch(`/document/${documentId}`)
@@ -131,7 +135,7 @@ function openReviewModal(documentId, documentType, score, explanation) {
                 throw new Error('Unsupported file type');
             }
 
-            modal.style.display = 'block';
+            modal.show();
         })
         .catch((error) => {
             console.error('Error:', error);
@@ -240,8 +244,8 @@ function reviewDocument(status) {
 }
 
 function closeModal() {
-    const modal = document.getElementById('reviewModal');
-    modal.style.display = 'none';
+    const modal = bootstrap.Modal.getInstance(document.getElementById('reviewModal'));
+    modal.hide();
 }
 
 document.querySelector('.close').onclick = closeModal;
