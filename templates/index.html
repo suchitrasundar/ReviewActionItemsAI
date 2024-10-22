@@ -21,12 +21,21 @@
             margin-bottom: 20px;
         }
         .action-item {
-            border: 1px solid #eee;
-            padding: 10px;
+            border: 1px solid #ccc;
             margin-bottom: 10px;
+            padding: 10px;
+            border-radius: 5px;
+        }
+        .action-item-header {
             display: flex;
             justify-content: space-between;
             align-items: center;
+            margin-bottom: 5px;
+        }
+        .action-item-explanation {
+            background-color: #f0f0f0;
+            padding: 5px;
+            border-radius: 3px;
         }
         .modal {
             display: none;
@@ -94,7 +103,12 @@
     </div>
     <div class="panel">
         <h2>Review Action Items</h2>
-        <div id="action-items"></div>
+        <div id="action-items">
+            <h2>Action Items</h2>
+            <ul id="action-items-list">
+                <!-- Action items will be dynamically inserted here -->
+            </ul>
+        </div>
     </div>
     <div id="reviewModal" class="modal">
         <div class="modal-content">
@@ -104,6 +118,7 @@
             <canvas id="pdfViewer" style="display:none; max-width:100%; max-height:400px;"></canvas>
             <div id="docxViewer" style="display:none; max-width:100%; max-height:400px;"></div>
             <p id="scoreText"></p>
+            <p id="explanationText"></p>
             <div class="button-container">
                 <button onclick="reviewDocument('Approved')">Approve</button>
                 <button onclick="reviewDocument('Rejected')">Reject</button>
@@ -111,5 +126,53 @@
         </div>
     </div>
     <script src="{{ url_for('static', filename='script.js') }}"></script>
+    <script>
+    function fetchActionItems() {
+        fetch('/action-items')
+            .then(response => response.json())
+            .then(data => {
+                const actionItemsList = document.getElementById('action-items-list');
+                actionItemsList.innerHTML = '';
+                data.forEach(item => {
+                    const li = document.createElement('li');
+                    li.innerHTML = `
+                        <strong>Document ID:</strong> ${item.document_id}<br>
+                        <strong>Type:</strong> ${item.document_type}<br>
+                        <strong>Student ID:</strong> ${item.student_id}<br>
+                        <strong>Score:</strong> ${item.score}<br>
+                        <strong>Explanation:</strong> ${item.explanation}<br>
+                        <button onclick="reviewDocument('${item.document_id}', 'Approved')">Approve</button>
+                        <button onclick="reviewDocument('${item.document_id}', 'Rejected')">Reject</button>
+                    `;
+                    actionItemsList.appendChild(li);
+                });
+            })
+            .catch(error => console.error('Error:', error));
+    }
+
+    function reviewDocument(documentId, status) {
+        fetch('/review', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                document_id: documentId,
+                status: status
+            }),
+        })
+        .then(response => response.json())
+        .then(data => {
+            console.log('Success:', data);
+            fetchActionItems();  // Refresh the list after review
+        })
+        .catch((error) => {
+            console.error('Error:', error);
+        });
+    }
+
+    // Fetch action items when the page loads
+    document.addEventListener('DOMContentLoaded', fetchActionItems);
+    </script>
 </body>
 </html>

@@ -33,7 +33,7 @@ function uploadDocument(type) {
                 console.log('Success:', data);
                 const label = document.getElementById(type + 'Label');
                 label.innerHTML += ` <span class="success-mark">✔</span> (Score: ${data.score})`;
-                fetchActionItems();
+                fetchActionItems();  // Add this line to refresh the action items
             })
             .catch((error) => {
                 console.error('Error:', error);
@@ -55,13 +55,18 @@ function fetchActionItems() {
         })
         .then(data => {
             const actionItemsContainer = document.getElementById('action-items');
-            actionItemsContainer.innerHTML = '';
+            actionItemsContainer.innerHTML = '<h2>Action Items</h2>';
             data.forEach(item => {
                 const div = document.createElement('div');
                 div.className = 'action-item';
                 div.innerHTML = `
-                    <span>${item.document_type} (Score: ${item.score})</span>
-                    <button onclick="openReviewModal('${item.document_id}', '${item.document_type}', ${item.score})">Review</button>
+                    <div class="action-item-header">
+                        <span><strong>${item.document_type}</strong> (Score: ${item.score})</span>
+                        <button onclick="openReviewModal('${item.document_id}', '${item.document_type}', ${item.score}, '${item.explanation.replace(/'/g, "\\'")}')">Review</button>
+                    </div>
+                    <div class="action-item-explanation">
+                        <p>${item.explanation}</p>
+                    </div>
                 `;
                 actionItemsContainer.appendChild(div);
             });
@@ -72,17 +77,19 @@ function fetchActionItems() {
         });
 }
 
-function openReviewModal(documentId, documentType, score) {
+function openReviewModal(documentId, documentType, score, explanation) {
     currentDocumentId = documentId;
     const modal = document.getElementById('reviewModal');
     const reviewTitle = document.getElementById('reviewTitle');
     const scoreText = document.getElementById('scoreText');
+    const explanationText = document.getElementById('explanationText');
     const documentPreview = document.getElementById('documentPreview');
     const pdfViewer = document.getElementById('pdfViewer');
     const docxViewer = document.getElementById('docxViewer');
 
     reviewTitle.textContent = `Reviewing document: ${documentType}`;
     scoreText.textContent = `Score: ${score}`;
+    explanationText.textContent = `Explanation: ${explanation}`;
 
     // Reset viewers
     documentPreview.style.display = 'none';
@@ -232,3 +239,5 @@ window.onclick = function(event) {
 }
 
 fetchActionItems();
+
+document.addEventListener('DOMContentLoaded', fetchActionItems);

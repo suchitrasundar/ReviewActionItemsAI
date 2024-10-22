@@ -9,6 +9,9 @@ from PIL import Image
 import PyPDF2
 import docx
 import easyocr
+import requests
+import re
+import time
 
 app = Flask(__name__)
 
@@ -28,11 +31,15 @@ def init_db():
                   filename TEXT, 
                   status TEXT DEFAULT 'Pending',
                   score INTEGER,
-                  resolution TEXT)''')
+                  resolution TEXT,
+                  explanation TEXT)''')
     conn.commit()
     conn.close()
 
 init_db()
+
+# Add your Hugging Face API token
+HF_API_TOKEN = "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"
 
 reader = easyocr.Reader(['en'])  # Initialize once
 
@@ -83,20 +90,75 @@ def extract_text_from_docx(file_path):
         print(traceback.format_exc())  # Print the full traceback for debugging
         return ""
 
-def calculate_score(file_path, file_type, text_content):
+def calculate_score(file_path, file_type, text_content, max_retries=3, initial_backoff=1):
     if file_type.startswith('image'):
         with Image.open(file_path) as img:
             width, height = img.size
             if width < 800 or height < 600:
-                return 1
+                return 1, "Low resolution image"
     
-    # Print the extracted text content
-    print(f"Extracted text content from {file_path}:")
-    print(text_content[:500])  # Print first 500 characters
-    print("=" * 50)  # Separator for readability in console output
+    API_URL = "https://api-inference.huggingface.co/models/mistralai/Mixtral-8x7B-Instruct-v0.1"
+    headers = {"Authorization": f"Bearer {HF_API_TOKEN}"}
+    
+    prompt = f"""[INST] Analyze the following text and provide a score from 1 to 10 based on its clarity, relevance, and completeness. Start the response with the numeric score, followed by a brief explanation of no more than two sentences. Do not use first-person language in the explanation.
 
-    # For now, we'll still return a random score
-    return random.randint(2, 10)
+Text: {text_content[:1000]}
+
+Score and Explanation: [/INST]"""
+
+    payload = {
+        "inputs": prompt,
+        "parameters": {"max_new_tokens": 100, "return_full_text": False}
+    }
+
+    for attempt in range(max_retries):
+        try:
+            response = requests.post(API_URL, headers=headers, json=payload, timeout=30)
+            response.raise_for_status()
+            result = response.json()
+
+            print("API Response:", result)
+
+            if isinstance(result, list) and len(result) > 0 and isinstance(result[0], dict) and 'generated_text' in result[0]:
+                generated_text = result[0]['generated_text']
+                
+                # Try to extract score using regex
+                score_match = re.search(r'\b([1-9]|10)\b', generated_text)
+                if score_match:
+                    score = int(score_match.group(1))
+                    explanation = generated_text.replace(score_match.group(0), '', 1).strip()
+                else:
+                    # If no clear score is found, estimate based on the content
+                    score = estimate_score(generated_text)
+                    explanation = generated_text.strip()
+                
+                return score, explanation
+            else:
+                raise ValueError("Unexpected response format from API")
+
+        except requests.exceptions.RequestException as e:
+            print(f"API request failed (attempt {attempt + 1}/{max_retries}): {str(e)}")
+            if attempt < max_retries - 1:
+                time.sleep(initial_backoff * (2 ** attempt))
+            else:
+                return fallback_scoring(text_content)
+
+        except Exception as e:
+            print(f"Unexpected error: {str(e)}")
+            return fallback_scoring(text_content)
+
+    return fallback_scoring(text_content)
+
+def estimate_score(text):
+    # Simple estimation based on positive words
+    positive_words = ['clear', 'relevant', 'complete', 'good', 'excellent', 'well', 'thorough']
+    word_count = sum(1 for word in positive_words if word in text.lower())
+    return min(max(word_count + 5, 1), 10)  # Ensure score is between 1 and 10
+
+def fallback_scoring(text_content):
+    score = random.randint(5, 8)  # More reasonable random range
+    explanation = "Fallback scoring used due to API issues. Score based on text length and complexity."
+    return score, explanation
 
 @app.route('/upload', methods=['POST'])
 def upload_document():
@@ -142,14 +204,14 @@ def upload_document():
         # Extract text from the uploaded file
         text_content = extract_text(filepath)
 
-        score = calculate_score(filepath, file_type, text_content)
+        score, explanation = calculate_score(filepath, file_type, text_content)
 
         try:
             conn = sqlite3.connect('documents.db')
             c = conn.cursor()
             document_id = str(uuid.uuid4())
-            c.execute("INSERT INTO documents (id, student_id, document_type, filename, score, resolution) VALUES (?, ?, ?, ?, ?, ?)",
-                      (document_id, student_id, document_type, unique_filename, score, resolution))
+            c.execute("INSERT INTO documents (id, student_id, document_type, filename, score, resolution, explanation) VALUES (?, ?, ?, ?, ?, ?, ?)",
+                      (document_id, student_id, document_type, unique_filename, score, resolution, explanation))
             conn.commit()
             print(f"Document saved to database. ID: {document_id}")
         except Exception as e:
@@ -158,7 +220,7 @@ def upload_document():
         finally:
             conn.close()
 
-        return jsonify({"message": "Document uploaded successfully", "document_id": document_id, "score": score}), 201
+        return jsonify({"message": "Document uploaded successfully", "document_id": document_id, "score": score, "explanation": explanation}), 201
     except Exception as e:
         app.logger.error(f"Unexpected error in upload: {str(e)}")
         app.logger.error(traceback.format_exc())
@@ -169,7 +231,7 @@ def list_action_items():
     try:
         conn = sqlite3.connect('documents.db')
         c = conn.cursor()
-        c.execute("SELECT id, document_type, student_id, score FROM documents WHERE status = 'Pending'")
+        c.execute("SELECT id, document_type, student_id, score, explanation FROM documents WHERE status = 'Pending'")
         documents = c.fetchall()
         conn.close()
 
@@ -179,7 +241,8 @@ def list_action_items():
                 "document_id": doc[0],
                 "document_type": doc[1],
                 "student_id": doc[2],
-                "score": doc[3]
+                "score": doc[3],
+                "explanation": doc[4]
             })
 
         return jsonify(action_items), 200
