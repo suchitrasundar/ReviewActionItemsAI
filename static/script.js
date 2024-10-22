@@ -94,10 +94,14 @@ function openReviewModal(documentId, documentType, score, explanation) {
     // Reset viewers
     documentPreview.style.display = 'none';
     pdfViewer.style.display = 'none';
+    docxViewer.style.display = 'none';
     docxViewer.innerHTML = '';
 
     fetch(`/document/${documentId}`)
         .then(response => {
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
             const contentType = response.headers.get('Content-Type');
             const contentDisposition = response.headers.get('Content-Disposition');
             let filename = 'unknown';
@@ -110,6 +114,9 @@ function openReviewModal(documentId, documentType, score, explanation) {
             return response.blob().then(blob => ({ blob, contentType, filename }));
         })
         .then(({ blob, contentType, filename }) => {
+            console.log('Content-Type:', contentType);
+            console.log('Filename:', filename);
+
             const fileExtension = filename.split('.').pop().toLowerCase();
 
             if (contentType === 'application/pdf' || fileExtension === 'pdf') {
@@ -118,15 +125,17 @@ function openReviewModal(documentId, documentType, score, explanation) {
                        contentType === 'application/msword' ||
                        fileExtension === 'docx' || fileExtension === 'doc') {
                 previewDOCX(blob);
-            } else {
+            } else if (contentType.startsWith('image/') || ['jpg', 'jpeg', 'png', 'gif'].includes(fileExtension)) {
                 previewImage(blob);
+            } else {
+                throw new Error('Unsupported file type');
             }
 
             modal.style.display = 'block';
         })
         .catch((error) => {
             console.error('Error:', error);
-            alert('Error loading document preview');
+            alert('Error loading document preview: ' + error.message);
         });
 }
 
@@ -180,6 +189,8 @@ function previewDOCX(blob) {
                         padding: 20px;
                         max-height: 400px;
                         overflow-y: auto;
+                        background-color: white;
+                        border: 1px solid #ccc;
                     }
                     #docxViewer img {
                         max-width: 100%;
@@ -189,9 +200,13 @@ function previewDOCX(blob) {
                 docxViewer.prepend(style);
             })
             .catch(function(error){
-                console.error(error);
+                console.error('Error converting Word document:', error);
                 docxViewer.innerHTML = 'Error previewing Word document: ' + error.message;
             });
+    };
+    reader.onerror = function(error) {
+        console.error('Error reading file:', error);
+        docxViewer.innerHTML = 'Error reading Word document: ' + error.message;
     };
     reader.readAsArrayBuffer(blob);
 }

@@ -12,6 +12,7 @@ import easyocr
 import requests
 import re
 import time
+import mimetypes
 
 app = Flask(__name__)
 
@@ -289,10 +290,23 @@ def get_document(document_id):
     if result:
         filename = result[0]
         filepath = os.path.join(UPLOAD_FOLDER, filename)
+        if not os.path.exists(filepath):
+            return jsonify({"error": "File not found"}), 404
+
+        mime_type, _ = mimetypes.guess_type(filepath)
+        if mime_type is None:
+            mime_type = 'application/octet-stream'
+
         try:
-            return send_file(filepath, as_attachment=True, download_name=filename)
-        except TypeError:
-            return send_file(filepath, as_attachment=True, attachment_filename=filename)
+            return send_file(
+                filepath,
+                mimetype=mime_type,
+                as_attachment=True,
+                download_name=filename
+            )
+        except Exception as e:
+            app.logger.error(f"Error sending file: {str(e)}")
+            return jsonify({"error": "Error sending file"}), 500
     else:
         return jsonify({"error": "Document not found"}), 404
 
