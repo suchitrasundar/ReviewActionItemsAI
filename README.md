@@ -15,7 +15,7 @@ Prototype Purpose: Demonstrate how documents are uploaded, scored, and reviewed.
 ### Step 1: Clone the Repository
 >bash
 git clone https://github.com/gurmesa/ReviewActionItemsAI.git
-cd ReviewActionItemsAI
+> cd ReviewActionItemsAI
 
 ### Step 2: Set Up a Virtual Environment
 >bash
