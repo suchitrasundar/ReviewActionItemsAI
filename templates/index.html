@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document Review System</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            display: flex;
+            justify-content: space-around;
+            padding: 20px;
+        }
+        .panel {
+            width: 45%;
+            border: 1px solid #ccc;
+            padding: 20px;
+            border-radius: 5px;
+        }
+        .upload-item {
+            margin-bottom: 20px;
+        }
+        .action-item {
+            border: 1px solid #eee;
+            padding: 10px;
+            margin-bottom: 10px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.4);
+        }
+        .modal-content {
+            background-color: #fefefe;
+            margin: 5% auto;
+            padding: 20px;
+            border: 1px solid #888;
+            width: 80%;
+            max-width: 600px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        .close {
+            color: #aaa;
+            align-self: flex-end;
+            font-size: 28px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+        #documentPreview {
+            max-width: 100%;
+            max-height: 400px;
+            margin-bottom: 20px;
+            border: 1px solid #ccc;
+        }
+        #pdfViewer {
+            width: 100%;
+            height: 400px;
+            display: none;
+        }
+        .button-container {
+            display: flex;
+            justify-content: space-around;
+            width: 100%;
+        }
+        .success-mark {
+            color: green;
+            margin-left: 5px;
+        }
+    </style>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.9.359/pdf.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.4.0/mammoth.browser.min.js"></script>
+</head>
+<body>
+    <div class="panel">
+        <h2>Uploads</h2>
+        <div class="upload-item">
+            <span id="citizenshipLabel">Proof of Citizenship</span>
+            <button onclick="uploadDocument('citizenship')">Upload</button>
+        </div>
+        <div class="upload-item">
+            <span id="w2Label">Student W2</span>
+            <button onclick="uploadDocument('w2')">Upload</button>
+        </div>
+    </div>
+    <div class="panel">
+        <h2>Review Action Items</h2>
+        <div id="action-items"></div>
+    </div>
+    <div id="reviewModal" class="modal">
+        <div class="modal-content">
+            <span class="close">&times;</span>
+            <h3 id="reviewTitle"></h3>
+            <img id="documentPreview" style="display:none; max-width:100%; max-height:400px;">
+            <canvas id="pdfViewer" style="display:none; max-width:100%; max-height:400px;"></canvas>
+            <div id="docxViewer" style="display:none; max-width:100%; max-height:400px;"></div>
+            <p id="scoreText"></p>
+            <div class="button-container">
+                <button onclick="reviewDocument('Approved')">Approve</button>
+                <button onclick="reviewDocument('Rejected')">Reject</button>
+            </div>
+        </div>
+    </div>
+    <script src="{{ url_for('static', filename='script.js') }}"></script>
+</body>
+</html>
